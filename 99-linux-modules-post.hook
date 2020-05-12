@@ -1,0 +1,15 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/src/*/dkms.conf
+Target = usr/lib/modules/*/build/include/
+
+[Action]
+Description = Restoring Linux kernel modules
+Depends = bash
+Depends = coreutils
+When = PostTransaction
+Exec = /usr/bin/linux-modules-hook post

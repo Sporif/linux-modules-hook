@@ -1,0 +1,66 @@
+#!/bin/bash
+
+error="\e[0;31m==> ERROR:\e[0m"
+
+if [ "$EUID" != 0 ]; then
+    echo -e "$error This script requires root" >&2
+    exit 1
+fi
+
+uname="$(uname -r)"
+mod_dir="/usr/lib/modules"
+curr_mod="${mod_dir}/${uname}"
+backup_dir="/tmp/linux-modules-backup/"
+tmp_mod="${backup_dir}/${uname}"
+
+if [[ -z "${uname}" ]]; then
+    echo -e "$error Failed to get current kernel version"
+    exit 1
+fi
+
+if [[ $1 == clean ]]; then
+    while IFS= read -r -d '' _link; do
+        if [[ $_link == "${curr_mod}" ]] || pacman -Qqo "${_link}" 2>/dev/null 1>&2; then
+            continue
+        fi
+        echo "Removing old backup link at ${_link}"
+        rm -- "${_link}"
+    done < <(find "${mod_dir}" -mindepth 1 -maxdepth 1 -type l -lname "${backup_dir}/[0-9]*-*" -print0)
+    [[ -d $backup_dir ]] || exit
+    while IFS= read -r -d '' _dir; do
+        if [[ $_dir == "${tmp_mod}" ]]; then
+            continue
+        fi
+        echo "Removing old backup dir at ${_dir}"
+        rm -rf -- "${_dir}"
+    done < <(find "${backup_dir}" -mindepth 1 -maxdepth 1 -type d -name "[0-9]*-*" -print0)
+elif [[ $1 == pre ]]; then
+    # Backup current modules, otherwise warn if they don't exist
+    if [[ -d $curr_mod && ! -L $curr_mod ]]; then
+        echo "==> Backing up '${curr_mod}' to '${backup_dir}'"
+        mkdir -p "${backup_dir}"
+        rsync -AHXal --delete-after "${curr_mod}" "${backup_dir}" || echo -e "$error Backup failed"
+    elif [[ ! -d "${curr_mod}" ]]; then
+        echo "==> Current kernel's module directory '${curr_mod}' does not exist"
+    fi
+
+    # Backup link of current kernel modules must be removed before dkms modules upgrade
+    # so that dkms does not install modules for a kernel that is uninstalled
+    find "${mod_dir}" -mindepth 1 -maxdepth 1 -type l -lname "${tmp_mod}" \
+    -delete -exec echo "==> Deleting backup link for current kernel at {}" \; || \
+    echo -e "$error Failed to delete link"
+elif [[ $1 == post ]]; then
+    # If the current kernel's modules directory exists remove the backup modules
+    # Otherwise link it to said directory
+    if [[ -d $tmp_mod && ! -L $tmp_mod ]]; then
+        if [[ -d $curr_mod && ! -L $curr_mod ]]; then
+            echo "==> Current kernel's modules present, removing backup at '${tmp_mod}'"
+            rm -rf -- "${tmp_mod}" || echo -e "$error Failed to remove backup"
+        else
+            echo "==> Creating link '${curr_mod}' to backup at '${tmp_mod}'"
+            ln -sf -- "${tmp_mod}" "${curr_mod}" || echo -e "$error Failed to create link"
+        fi
+    else
+        echo "==> Backup modules directory '${tmp_mod}' does not exist"
+    fi
+fi

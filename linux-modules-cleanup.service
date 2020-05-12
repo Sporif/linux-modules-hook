@@ -1,0 +1,9 @@
+[Unit]
+Description=Clean up modules from old kernels
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/linux-modules-hook clean
+
+[Install]
+WantedBy=basic.target
