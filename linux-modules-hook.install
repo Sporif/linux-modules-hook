@@ -1,7 +1,7 @@
 post_install() {
     cat << EOF
 
-Remember to enable the sevice:
+Remember to enable the service:
 
   $ sudo systemctl daemon-reload
   $ sudo systemctl enable linux-modules-cleanup
