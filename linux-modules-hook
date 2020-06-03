@@ -10,7 +10,7 @@ fi
 uname="$(uname -r)"
 mod_dir="/usr/lib/modules"
 curr_mod="${mod_dir}/${uname}"
-backup_dir="/tmp/linux-modules-backup/"
+backup_dir="/tmp/linux-modules-backup"
 tmp_mod="${backup_dir}/${uname}"
 
 if [[ -z "${uname}" ]]; then
@@ -38,8 +38,12 @@ elif [[ $1 == pre ]]; then
     # Backup current modules, otherwise warn if they don't exist
     if [[ -d $curr_mod && ! -L $curr_mod ]]; then
         echo "==> Backing up '${curr_mod}' to '${backup_dir}'"
-        mkdir -p "${backup_dir}"
-        rsync -AHXal --delete-after "${curr_mod}" "${backup_dir}" || echo -e "$error Backup failed"
+        if mkdir -p "${backup_dir}"; then
+            rsync -AHXal --delete-after "${curr_mod}" "${backup_dir}/" || echo -e "$error Backup failed"
+        else
+            echo -e "$error Failed to create backup directory"
+            exit 1
+        fi
     elif [[ ! -d "${curr_mod}" ]]; then
         echo "==> Current kernel's module directory '${curr_mod}' does not exist"
     fi
